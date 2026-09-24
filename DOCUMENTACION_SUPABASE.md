@@ -32,7 +32,6 @@ La aplicación está diseñada bajo una arquitectura basada en **Roles y Estados
 
 ```text
 miAppTS/
-├── .env.example                 # Plantilla de variables de entorno
 ├── .env                         # Credenciales públicas de Supabase (git-ignored)
 ├── App.tsx                      # Enrutamiento dinámico según estado de sesión y rol
 └── src/
