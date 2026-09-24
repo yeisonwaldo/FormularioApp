@@ -1,5 +1,3 @@
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import {
   Alert,
@@ -12,11 +10,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../auth/AuthContext';
-import { TEST_USER } from '../auth/users';
 import { AuthInput } from '../components/AuthInput';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { AuthStackParamList } from '../navigation/types';
+import type { AuthStackParamList } from '../navigation/types';
 import { colors, spacing } from '../theme';
 
 type LoginNav = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
@@ -28,37 +27,36 @@ function isValidEmail(email: string) {
 export function LoginScreen() {
   const navigation = useNavigation<LoginNav>();
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
+  const { signIn, perfil } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const onSignIn = () => {
+  const onSignIn = async () => {
     if (!email.trim() || !password) {
       Alert.alert('Campos incompletos', 'Ingresa tu correo y contraseña.');
       return;
     }
     if (!isValidEmail(email)) {
-      Alert.alert('Correo inválido', 'Revisa el formato del correo.');
+      Alert.alert('Correo inválido', 'Revisa el formato del correo electrónico.');
       return;
     }
 
-    const error = signIn(email, password);
+    setLoading(true);
+    const error = await signIn(email, password);
+    setLoading(false);
+
     if (error) {
-      Alert.alert('No se pudo iniciar sesión', error);
+      Alert.alert('Error al iniciar sesión', error);
     }
+    // Si perfil.estado === 'pendiente', App.tsx mostrará la pantalla de espera
   };
 
   return (
     <View style={styles.screen}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 24 },
-          ]}
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -67,7 +65,7 @@ export function LoginScreen() {
 
           <View style={styles.form}>
             <AuthInput
-              placeholder="Email"
+              placeholder="Correo electrónico"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -83,24 +81,15 @@ export function LoginScreen() {
               textContentType="password"
             />
 
-            <Pressable
-              onPress={() =>
-                Alert.alert(
-                  'Usuario de prueba',
-                  `Usa estas credenciales:\n\nCorreo: ${TEST_USER.email}\nContraseña: ${TEST_USER.password}`,
-                )
-              }
-            >
-              <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
-            </Pressable>
-
-            <PrimaryButton title="Iniciar sesión" onPress={onSignIn} />
+            <PrimaryButton title="Iniciar sesión" onPress={onSignIn} loading={loading} />
 
             <Pressable onPress={() => navigation.navigate('Register')} style={styles.linkWrap}>
-              <Text style={styles.link}>Crear nueva cuenta</Text>
+              <Text style={styles.link}>
+                ¿No tienes cuenta?{' '}
+                <Text style={{ color: colors.primary }}>Regístrate</Text>
+              </Text>
             </Pressable>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -108,17 +97,9 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screen,
-  },
+  screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  content: { flexGrow: 1, paddingHorizontal: spacing.screen },
   title: {
     color: colors.primary,
     fontSize: 32,
@@ -129,37 +110,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
     color: colors.text,
     fontSize: 18,
-    lineHeight: 26,
     fontFamily: 'Poppins_600SemiBold',
     textAlign: 'center',
   },
-  form: {
-    marginTop: 48,
-    gap: 18,
-  },
-  forgot: {
-    alignSelf: 'flex-end',
-    color: colors.primary,
-    fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  linkWrap: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
+  form: { marginTop: 48, gap: 18 },
+  linkWrap: { alignItems: 'center', paddingVertical: 8 },
   link: {
-    color: colors.text,
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  hint: {
-    marginTop: 'auto',
-    paddingTop: 24,
-    textAlign: 'center',
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
   },
 });

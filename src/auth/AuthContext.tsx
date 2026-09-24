@@ -1,47 +1,101 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
-import { AppUser, authenticate, registerUser } from './users';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+import type { Perfil } from '../types/db';
 
 type AuthContextValue = {
-  user: AppUser | null;
-  signIn: (email: string, password: string) => string | null;
-  signUp: (email: string, password: string) => string | null;
-  signOut: () => void;
+  user: User | null;
+  perfil: Perfil | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signUp: (email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
+  refreshPerfil: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPerfil = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('perfiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      console.warn('Error fetching perfil:', error.message);
+    }
+    setPerfil(data ?? null);
+  }, []);
+
+  // Inicializar sesión al arrancar
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchPerfil(session.user.id).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchPerfil(session.user.id);
+        } else {
+          setPerfil(null);
+        }
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, [fetchPerfil]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      signIn: (email, password) => {
-        const found = authenticate(email, password);
-        if (!found) {
-          return 'Correo o contraseña incorrectos.';
+      perfil,
+      loading,
+      refreshPerfil: () => (user ? fetchPerfil(user.id) : Promise.resolve()),
+      signIn: async (email, password) => {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            return 'Correo o contraseña incorrectos.';
+          }
+          return error.message;
         }
-        setUser(found);
         return null;
       },
-      signUp: (email, password) => {
-        const result = registerUser({
-          email,
+      signUp: async (email, password) => {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
           password,
-          name: email.split('@')[0],
         });
-        if (!result.ok) {
-          return result.message;
-        }
-        const found = authenticate(email, password);
-        if (found) {
-          setUser(found);
+        if (error) {
+          if (error.message.includes('already registered')) {
+            return 'Ya existe una cuenta con este correo.';
+          }
+          if (error.message.toLowerCase().includes('rate limit')) {
+            return 'Supabase ha bloqueado temporalmente el envío de correos por demasiados intentos. Por favor espera 2 o 3 minutos e inténtalo de nuevo.';
+          }
+          return error.message;
         }
         return null;
       },
-      signOut: () => setUser(null),
+      signOut: async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setPerfil(null);
+      },
     }),
-    [user],
+    [user, perfil, loading, fetchPerfil],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -49,8 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe usarse dentro de AuthProvider');
-  }
+  if (!context) throw new Error('useAuth debe usarse dentro de AuthProvider');
   return context;
 }

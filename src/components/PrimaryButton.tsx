@@ -1,37 +1,67 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius } from '../theme';
 
-type PrimaryButtonProps = {
+type Props = {
   title: string;
   onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  variant?: 'primary' | 'outline' | 'danger';
 };
 
-export function PrimaryButton({ title, onPress }: PrimaryButtonProps) {
+export function PrimaryButton({ title, onPress, loading = false, disabled = false, variant = 'primary' }: Props) {
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+      disabled={isDisabled}
+      style={({ pressed }) => [
+        styles.btn,
+        variant === 'outline' && styles.outline,
+        variant === 'danger' && styles.danger,
+        (pressed || isDisabled) && styles.pressed,
+      ]}
     >
-      <Text style={styles.title}>{title}</Text>
+      {loading ? (
+        <ActivityIndicator color={variant === 'primary' ? colors.white : colors.primary} size="small" />
+      ) : (
+        <Text style={[styles.label, variant === 'outline' && styles.labelOutline, variant === 'danger' && styles.labelDanger]}>
+          {title}
+        </Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
+  btn: {
     height: 56,
     borderRadius: radius.button,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
-  title: {
+  danger: {
+    backgroundColor: colors.error,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  label: {
     color: colors.white,
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
+  },
+  labelOutline: {
+    color: colors.primary,
+  },
+  labelDanger: {
+    color: colors.white,
   },
 });
