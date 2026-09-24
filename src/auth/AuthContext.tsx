@@ -74,9 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       },
       signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim().toLowerCase(),
+        const cleanEmail = email.trim().toLowerCase();
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
           password,
+          options: {
+            data: {
+              email: cleanEmail,
+            },
+          },
         });
         if (error) {
           if (error.message.includes('already registered')) {
@@ -86,6 +92,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return 'Supabase ha bloqueado temporalmente el envío de correos por demasiados intentos. Por favor espera 2 o 3 minutos e inténtalo de nuevo.';
           }
           return error.message;
+        }
+
+        // Si se creó el usuario en Supabase Auth, aseguramos guardar el email en el perfil
+        if (data?.user) {
+          try {
+            await supabase
+              .from('perfiles')
+              .upsert({
+                id: data.user.id,
+                email: cleanEmail,
+                estado: 'pendiente',
+                rol: 'cliente',
+              } as any);
+          } catch {
+            // Si la columna email aún no existe o el trigger ya lo manejó, continúa sin bloquear el flujo
+          }
         }
         return null;
       },

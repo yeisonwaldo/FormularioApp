@@ -127,10 +127,46 @@ A continuación se detalla el script SQL completo para crear las tablas, relacio
 -- 1. TABLA PERFILES (Conectada a auth.users)
 CREATE TABLE IF NOT EXISTS public.perfiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email VARCHAR(255),
   estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'activo')),
   rol VARCHAR(20) NOT NULL DEFAULT 'cliente' CHECK (rol IN ('admin', 'cliente')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Si la tabla ya fue creada previamente, añadir la columna email:
+ALTER TABLE public.perfiles ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+
+-- Sincronizar correos de usuarios ya existentes desde auth.users
+UPDATE public.perfiles p
+SET email = u.email
+FROM auth.users u
+WHERE p.id = u.id;
+
+-- Trigger para registrar automáticamente el correo en perfiles al crearse un usuario en auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO public.perfiles (id, email, estado, rol)
+  VALUES (
+    NEW.id, 
+    NEW.email, 
+    'pendiente', 
+    'cliente'
+  )
+  ON CONFLICT (id) DO UPDATE 
+  SET email = EXCLUDED.email;
+  
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 2. TABLA CLIENTES (Información personal del cliente)
 CREATE TABLE IF NOT EXISTS public.clientes (

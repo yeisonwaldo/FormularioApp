@@ -105,8 +105,39 @@ export function ProductosScreen() {
         style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.from('productos').delete().eq('id', id);
-          if (error) Alert.alert('Error', error.message);
-          else fetchProductos();
+          if (error) {
+            if (
+              error.message.includes('foreign key constraint') ||
+              error.message.includes('detalles_id_producto_fkey')
+            ) {
+              Alert.alert(
+                'No se puede eliminar',
+                `El producto "${nombre}" ya tiene compras registradas en el historial de pedidos.\n\nPara no alterar los comprobantes de compra existentes, no se puede borrar de la base de datos.\n\n¿Deseas dejar su stock en 0 para que los clientes ya no puedan comprarlo?`,
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Poner stock en 0',
+                    onPress: async () => {
+                      const { error: updateErr } = await supabase
+                        .from('productos')
+                        .update({ stock: 0 } as any)
+                        .eq('id', id);
+                      if (updateErr) {
+                        Alert.alert('Error', updateErr.message);
+                      } else {
+                        Alert.alert('Stock actualizado', `El stock de "${nombre}" se ajustó a 0.`);
+                        fetchProductos();
+                      }
+                    },
+                  },
+                ],
+              );
+            } else {
+              Alert.alert('Error', error.message);
+            }
+          } else {
+            fetchProductos();
+          }
         },
       },
     ]);

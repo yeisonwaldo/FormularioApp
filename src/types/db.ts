@@ -2,6 +2,7 @@
 
 export type Perfil = {
   id: string;
+  email?: string | null;
   estado: 'pendiente' | 'activo';
   rol: 'admin' | 'cliente';
   created_at: string;
