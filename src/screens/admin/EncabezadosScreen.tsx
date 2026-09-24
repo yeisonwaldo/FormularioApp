@@ -15,7 +15,7 @@ import { colors, radius, spacing } from '../../theme';
 
 type EncabezadoConDetalles = Encabezado & {
   detalles: (Detalle & { productos: { nombre: string; valor_unitario: number } | null })[];
-  cliente_nombre?: string;
+  clientes: { nombre: string; apellido: string } | null;
 };
 
 export function EncabezadosScreen() {
@@ -28,8 +28,8 @@ export function EncabezadosScreen() {
     setLoading(true);
     const { data, error } = await supabase
       .from('encabezados')
-      .select('*, detalles(*, productos(nombre, valor_unitario))')
-      .order('fecha', { ascending: false });
+      .select('*, detalles(*, productos(nombre, valor_unitario)), clientes(nombre, apellido)')
+      .order('fecha', { ascending: true });
 
     if (error) Alert.alert('Error', error.message);
     else setCompras((data as EncabezadoConDetalles[]) ?? []);
@@ -44,11 +44,15 @@ export function EncabezadosScreen() {
 
   const renderItem = ({ item }: { item: EncabezadoConDetalles }) => {
     const isOpen = expandido === item.id;
+    const clienteNombre = item.clientes 
+      ? `${item.clientes.nombre} ${item.clientes.apellido}`
+      : 'Cliente desconocido';
     return (
       <View style={styles.card}>
         <Pressable style={styles.cardHeader} onPress={() => toggleExpand(item.id)}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.cardId} numberOfLines={1}>Orden #{item.id.slice(0, 8).toUpperCase()}</Text>
+            <Text style={styles.clienteName} numberOfLines={1}>{clienteNombre}</Text>
             <Text style={styles.cardFecha}>{new Date(item.fecha).toLocaleDateString('es-CO')}</Text>
           </View>
           <View style={styles.rightCol}>
@@ -132,6 +136,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardId: { fontSize: 14, fontFamily: 'Poppins_600SemiBold', color: colors.text },
+  clienteName: { fontSize: 13, fontFamily: 'Poppins_500Medium', color: colors.primary, marginTop: 4 },
   cardFecha: { fontSize: 12, color: colors.muted, fontFamily: 'Poppins_400Regular', marginTop: 2 },
   rightCol: { alignItems: 'flex-end', gap: 4 },
   totalText: { fontSize: 16, fontFamily: 'Poppins_700Bold', color: colors.primary },
